@@ -1,0 +1,1 @@
+{"Kind": "SplittedAreaChartTransformer", "Args": {"colormap": "seismic", "stacked": false, "splitsize": 10,"imgsize":[465, 310]}}

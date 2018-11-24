@@ -1,0 +1,18 @@
+<RCC>
+    <qresource prefix="/">
+        <file>styles/iStudio.css</file>
+        <file>images/data-grey.png</file>
+        <file>images/data-white.png</file>
+        <file>images/deploy-grey.png</file>
+        <file>images/deploy-white.png</file>
+        <file>images/machine-training-grey.png</file>
+        <file>images/machine-training-white.png</file>
+        <file>images/giga-powers-grey.png</file>
+        <file>images/giga-powers-white.png</file>
+        <file>images/machine-testing-grey.png</file>
+        <file>images/machine-testing-white.png</file>
+        <file>images/simulation-grey.png</file>
+        <file>images/simulation-white.png</file>
+
+    </qresource>
+</RCC>
