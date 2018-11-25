@@ -34,7 +34,8 @@ FORMS += \
         widgets/mainwindow.ui\
         widgets/gigapowers/gigapowerswidget.ui \
         widgets/gigapowers/wellrowwidget.ui \
-    widgets/datawidget.ui
+    widgets/datawidget.ui \
+    widgets/editlabel.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

@@ -12,7 +12,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import QApplication 
 
 from widgets.mainwindow import Ui_MainWindow
-from widgets.gigapowers import GigaPOWERSWidget
+#from widgets.gigapowers import GigaPOWERSWidget
 from widgets.datawidget import DataWidget
 from core.config import CLASSIFIERS_PATH
 import utils
