@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import QApplication
 from widgets.mainwindow import Ui_MainWindow
 #from widgets.gigapowers import GigaPOWERSWidget
 from widgets.datawidget import DataWidget
+from widgets.trainingwidget import TrainingWidget
 from core.config import CLASSIFIERS_PATH
 import utils
 
@@ -36,6 +37,12 @@ class iStudio(QtWidgets.QMainWindow):
 		dataLayout = QVBoxLayout()
 		dataLayout.addWidget(dataWidget)
 		self.ui.pageData.setLayout(dataLayout)
+
+		trainingWidget = TrainingWidget(self)
+		self._trainingWidget = trainingWidget
+		trainingLayout = QVBoxLayout()
+		trainingLayout.addWidget(trainingWidget)
+		self.ui.pageTrain.setLayout(trainingLayout)
 
 		# gpWidget = GigaPOWERSWidget(self,CLASSIFIERS_PATH)
 		# self._gpWidget = gpWidget
