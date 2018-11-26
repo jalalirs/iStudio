@@ -35,7 +35,9 @@ FORMS += \
         widgets/gigapowers/gigapowerswidget.ui \
         widgets/gigapowers/wellrowwidget.ui \
     widgets/datawidget.ui \
-    widgets/editlabel.ui
+    widgets/trainingwidget.ui \
+    widgets/neuralnetwork.ui \
+    widgets/neuralnetworklayer.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
