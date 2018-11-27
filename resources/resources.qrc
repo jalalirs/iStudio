@@ -1,6 +1,10 @@
 <RCC>
     <qresource prefix="/">
         <file>styles/iStudio.css</file>
+        <file>images/qcustomtemplate.png</file>
+        <file>images/training_vs_validation.jpg</file>
+        <file>images/conv_filter.png</file>
+        <file>images/play_button.png</file>
         <file>images/data-grey.png</file>
         <file>images/data-white.png</file>
         <file>images/deploy-grey.png</file>
