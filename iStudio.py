@@ -51,8 +51,8 @@ class iStudio(QtWidgets.QMainWindow):
 		# self.ui.pageGP.setLayout(gplayout)
 
 		# self.on_pbData_released()
-		self.ui.mainStackedWidget.setCurrentIndex(0)
-		self.uncheck_and_keep(0)
+		self.ui.mainStackedWidget.setCurrentIndex(1)
+		self.uncheck_and_keep(1)
 
 		
 

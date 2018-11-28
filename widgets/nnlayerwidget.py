@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout
 from PyQt5 import Qt
 
 class NeuronGroupWidget(QtWidgets.QWidget):
-    def __init__(self,parent,maxNeurons=2):
+    def __init__(self,parent,maxNeurons=32):
         super(QWidget, self).__init__(parent)
 
         self._maxNeurons = maxNeurons
