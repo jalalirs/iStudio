@@ -10,4 +10,4 @@ if [[ "$#" -eq 1 ]]
 fi
 
 
-python3.6 iStudio.py
+python3.7 iStudio.py

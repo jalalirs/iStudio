@@ -22,11 +22,11 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 CONFIG += c++11
 
-SOURCES += QCustomPlot-PyQt5/lib/qcustomplot.cpp \
+SOURCES += ../QCustomPlot-PyQt5/lib/qcustomplot.cpp \
 
 
 
-HEADERS += QCustomPlot-PyQt5/lib/qcustomplot.h \
+HEADERS += ../QCustomPlot-PyQt5/lib/qcustomplot.h \
 
 
 
@@ -37,7 +37,8 @@ FORMS += \
     widgets/datawidget.ui \
     widgets/trainingwidget.ui \
     widgets/neuralnetwork.ui \
-    widgets/neuralnetworklayer.ui
+    widgets/neuralnetworklayer.ui \
+    widgets/confusionmatrix.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
