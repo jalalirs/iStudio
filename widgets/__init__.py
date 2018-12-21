@@ -1,2 +1,3 @@
+#from . import gigapowerswidget
 
-from. import datawidget_ui
+#GigaPOWERSWidget = gigapowerswidget.GigaPOWERSWidget

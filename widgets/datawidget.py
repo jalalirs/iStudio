@@ -14,26 +14,158 @@ from PIL import Image
 import os
 import pandas as pd
 from PIL.ImageQt import ImageQt
-
-
+import json
+from .paintingwidget import PaintingWidget
 
 class ImageDataItem:
-	def __init__(self,name,path):
+	def __init__(self,name,path,width=None,height=None,uri=None,datecaptured=None):
 		self._name = name
 		self._path = path
 		self._image =  Image.open(path)
-
-
-class Dataset:
-	def __init__(self,datasetpath,protocol = "scikitlearn"):
+		self._width = width
+		self._height = height
+		self._uri = uri
+		self._datecaptured = datecaptured
+class CocoDataset:
+	def __init__(self,datasetpath):
 		self._path = datasetpath
-		self._protocol = protocol	
+		self._name = self._path.split("/")[-1]
+		self._images = None
+		self._annotations = None
+		self._categories = None
+		self._data = {}
+		self._challenges = ["Classification","Detection","Segmentation","Keypoints","Captioning"]
+		self._detectionColors = ['r','b','g','b']
+	def load_(self):
+		folders = ["%s/%s" % (self._path,x) for x in ["train","val","test"]]
+		annotations = "%s/annotation" % (self._path)
+
+		def open_section(section):
+			with open("%s/%s/instances_%s2017.json" % (annotations,section,section)) as f:
+				td = json.load(f)
+				s_annotation = pd.DataFrame(td["annotations"])
+				s_images = pd.DataFrame(td["images"])
+				s_categories = pd.DataFrame(td["categories"])
+
+				s_annotation["section"] = section
+				s_images["section"] = section
+				s_categories["section"] = section
+
+				s_images["dir"] = "%s/%s" % (self._path,section)
+
+				s_images["id"] = s_images["id"].astype(int)
+				s_annotation["image_id"] = s_annotation["image_id"].astype(int)
+			return s_images,s_annotation,s_categories
+		
+		tr_im, tr_ann, tr_cat = open_section("train")
+		va_im, va_ann, va_cat = open_section("val")
+
+		self._images = pd.concat([tr_im,va_im])
+		self._annotations = pd.concat([tr_ann,va_ann])
+		self._categories = pd.concat([tr_cat,va_cat])	
+
+		self._images = self._images.set_index("id",drop=False)
+		categories = self._annotations.groupby("image_id")["category_id"].apply(list)
+		self._images.categories = categories
+		self._images.categories.fillna(-1,inplace=True)
+		catdict = self._categories.set_index("id").to_dict()["name"]
+
+		def id_to_value(x):
+			if x == -1:
+				return []
+			elif type(x) == list:
+				return [catdict[d] for d in x]
+			else:
+				return [catdict[d]]
+		self._images["categories_value"] = self._images.categories.apply(id_to_value)		
+	@property
+	def sections_names(self):
+		return self._images.section.unique().tolist()
+	@property
+	def labels(self):
+		return self._categories.name.unique().tolist()
+	def get_label(self,imgid,challenge="classification"):
+		if challenge == 'classification':
+			cat = self.get_categories(imgid)
+			return ",".join(cat)
+	def __getitem__(self,index):
+		if type(index) == str:
+			index = int(index) 
+
+		if index in self._images.id.values:
+			if index not in self._data.keys():
+				md = self._images.loc[index]
+				self._data[index] = ImageDataItem(md.file_name,"%s/%s" % (md.dir,md.file_name),
+					md.width,md.height,md.coco_url,md.date_captured)
+				
+			return self._data[index]
+	def get_categories(self,imgid):
+		if type(imgid) == str:
+			imgid = int(imgid)
+		categories = self._annotations[self._annotations["image_id"]==imgid].category_id.unique().tolist()
+		return np.unique(self._categories[self._categories["id"].isin(categories)].name.values).tolist()
+	def get_bboxes(self,imgid):
+		if type(imgid) == str:
+			imgid = int(imgid)
+		boxes = self._annotations[self._annotations["image_id"]==imgid].bbox.tolist()
+		return boxes
+	def get_data_list(self,labels=None):
+		df = self._images.copy()
+		if labels:
+			def filter_fn(row):
+				cats = row.categories_value
+				if type(cats) == float:
+					return cats in labels
+				for c in cats:
+					if c in labels:
+						return True
+				return False		
+			df = df[df.apply(filter_fn, axis=1)]
+
+		return df[['section','id']].groupby("section")["id"].apply(list).to_dict()
+	def get_challenges(self):
+		return self._challenges
+	def apply_challenge(self,challenge,item,guiplaceholders):
+		if challenge == "Classification":
+			guiplaceholders["label"].setText(self.get_label(item))
+		if challenge == "Detection":
+			for i,value in enumerate(self.get_bboxes(item)):
+				x,y,width,height = value
+				color = self._detectionColors[i%len(self._detectionColors)]
+				guiplaceholders["image"].paint_rectangle(x,y,width,height,color)
+
+	@staticmethod
+	def load(datasetpath):
+		print(datasetpath)
+		_data = CocoDataset(datasetpath)
+		_data.load_()
+		
+		return _data
+class ScikitLearnDataset:
+	def __init__(self,datasetpath):
+		self._path = datasetpath
 		self._data = {}
 		self._labels = []
 		self._sections = {}
 		self._data_df = None
 		self._name = self._path.split("/")[-1]
-	def load_scikitlearn(self):	
+		self._challenges = ["Classification"]
+	@property
+	def sections_names(self):
+		return self._data_df.new_section.unique().tolist()
+	@property
+	def labels(self):
+		return self._data_df.new_label.unique().tolist()
+	@property
+	def sections(self):
+		return self._data_df.new_section.unique().tolist()
+	def get_label(self,name):
+		return self._data_df.loc[name].new_label
+	def get_challenges(self):
+		return self._challenges
+	def datanames_in(self,s):
+		return self._data_df[self._data_df["new_section"] == s]["new_name"].tolist()
+	def load_(self):
 		sections = [name for name in os.listdir(self._path) 
 			if os.path.isdir(os.path.join(self._path, name))]
 		if len(sections) <= 0:
@@ -54,24 +186,6 @@ class Dataset:
 					os.path.join(path,f)) for f in os.listdir(path) if os.path.isfile(os.path.join(path,f)) ]
 		self._data_df = pd.DataFrame(data,columns=["id","name","new_name","section","new_section","label","new_label","path"])
 		self._data_df.set_index("id",inplace=True)
-	@property
-	def sections_names(self):
-		return self._data_df.new_section.unique().tolist()
-	@property
-	def labels(self):
-		return self._data_df.new_label.unique().tolist()
-	@property
-	def sections(self):
-		return self._data_df.new_section.unique().tolist()
-	def get_label(self,name):
-		return self._data_df.loc[name].new_label
-	def datanames_in(self,s):
-		return self._data_df[self._data_df["new_section"] == s]["new_name"].tolist()
-	def load_(self):
-		load_func = {
-		"scikitlearn": self.load_scikitlearn
-		}
-		load_func[self._protocol]()
 	def __getitem__(self,index):
 		if type(index) == str and index in self._data_df.name:
 			if index not in self._data.keys():
@@ -119,7 +233,7 @@ class Dataset:
 		cn = set(self._data_df.name.tolist())
 		if sn.issubset(cn):
 			self._data_df = df
-	def publish(self,path,protocol="scikitlearn"):
+	def publish(self,path):
 		from shutil import copyfile
 		def _mkdir(f):
 			if not os.path.exists(f):
@@ -135,14 +249,28 @@ class Dataset:
 			for i,lbl in enumerate(self.labels):
 				_mkdir("%s/%s/%d.%s" % (path,s,i,lbl))
 		self._data_df.apply(lambda row: _copy(row['path'], row['new_section'], row['new_name'],row['new_label']), axis=1)		
+	def get_data_list(self,labels = None):
+		df = self._data_df.copy()
+		if labels:
+			df = df[df["label"].isin(labels)]
+
+		return df[['new_section','new_name']].groupby("new_section")["new_name"].apply(list).to_dict()
+	def apply_challenge(self,challenge,item,guiplaceholders):
+		if challenge == "Classification":
+			guiplaceholders["label"].setText(self.get_label(item))
 	@staticmethod
-	def load(datasetpath,protocol="scikitlearn"):
-		_data = Dataset(datasetpath,protocol)
+	def load(datasetpath):
+		_data = ScikitLearnDataset(datasetpath)
 		_data.load_()
 		
 		return _data
-
-
+class Dataset:
+	@staticmethod
+	def load(datasetpath,protocol="scikitlearn"):
+		if protocol == "scikitlearn":
+			return ScikitLearnDataset.load(datasetpath)
+		elif protocol == "coco":
+			return CocoDataset.load(datasetpath)
 class DatasetBank:
 	def __init__(self):
 		self._datasets = {}
@@ -154,7 +282,6 @@ class DatasetBank:
 		_set = Dataset.load(datasetpath,protocol)
 		self._datasets[_set._name] = _set
 		return _set
-
 class DataWidget(QWidget,Ui_DataWidget):
 	def __init__(self,parent):
 		QWidget.__init__(self,parent)
@@ -167,6 +294,15 @@ class DataWidget(QWidget,Ui_DataWidget):
 		self.dataTreeWidget.itemClicked.connect(self.handle_selection)
 		self._qtreeWidgetItems = None
 		self._currentItem = None
+		self._currentItemId = None
+		self._paintingWidget = PaintingWidget(self.paintingWidget,
+			self.paintingWidget.width(),self.paintingWidget.height())
+		self.paintingLayout.addWidget(self._paintingWidget)
+		self._currentChallenge = None
+		self.cmbChallenge.currentIndexChanged.connect(self.on_challenge_changed)
+	def on_challenge_changed(self):
+		self._currentChallenge = self.cmbChallenge.currentText()
+		self.apply_challenge(self._currentChallenge)
 	def get_checked_items(self):
 		selected = []
 		for i in self._qtreeWidgetItems:
@@ -251,8 +387,8 @@ class DataWidget(QWidget,Ui_DataWidget):
 		path = qtutil.browse()
 		if path == None or path.strip() == "":
 			return
-		
-		dataset = self._databank.create(path)
+		protocol = self.cmbProtocol.currentText()
+		dataset = self._databank.create(path,protocol)
 		dname = dataset._name
 		if dname not in self._datasetnames:
 			self.cmbDataset.addItems([dataset._name])
@@ -260,6 +396,9 @@ class DataWidget(QWidget,Ui_DataWidget):
 				self.cmbDataset.setCurrentIndex(self.cmbDataset.count() - 1)
 		self.cmbDataset.setEnabled(True)
 		self._currentDataset = self._databank[self.cmbDataset.currentText()]
+		self.cmbChallenge.clear()
+		self.cmbChallenge.addItems(dataset.get_challenges())
+		self.cmbChallenge.setEnabled(True)
 		self._refresh_view()
 		self.pbPublish.setEnabled(True)
 		self.pbLoadSession.setEnabled(True)
@@ -292,48 +431,59 @@ class DataWidget(QWidget,Ui_DataWidget):
 	def refresh_plot(self):
 		selected = self.dataTreeWidget.selectedItems()
 		if selected:
-			size = 128, 128
 			section = selected[0]
-			item = section.text(0)
-			img = self._currentDataset[item]._path
-			self.imgLbl.setPixmap(QtGui.QPixmap(img))
-			self.lineName.setText(item)
-			self.cmbLabel.clear()
-			self.cmbLabel.addItems(self._currentDataset.labels)
-			index = self.cmbLabel.findText(self._currentDataset.get_label(item), QtCore.Qt.MatchFixedString)
-			self.cmbLabel.setCurrentIndex(index)
+			selecteditem = section.text(0)
+			item = self._currentDataset[selecteditem]
 			self._currentItem = item
-			self._set_edit_widgets(True)
+			self._currentItemId = selecteditem
+			self._paintingWidget.paint_img(item._path)
+			self._paintingWidget.update()
+			self.lblInstancelName.setText(item._name)
+			self.lblInstanceLabel.setText(self._currentDataset.get_label(selecteditem))
+			if item._width:
+				self.lblInstanceWidth.setText(str(item._width))
+			else:
+				self.lblInstanceWidth.setText("")
+			if item._height:
+				self.lblInstanceHeight.setText(str(item._height))
+			else:
+				self.lblInstanceHeight.setText("")
+			if item._uri:
+				self.lblInstanceURI.setText(item._uri)
+			else:
+				self.lblInstanceURI.setText("")
+			if item._datecaptured:
+				self.lblInstanceDate.setText(item._datecaptured)
+			else:
+				self.lblInstanceDate.setText("")
+			self.apply_challenge(self.cmbChallenge.currentText())
 	def pbLabelClicked(self):
+		expansion = self.memorize_expansion()
 		self._color_selected_labels()
 		labels = self._selected_labels()
 		self._filter_by_label(labels)
+		self.expand(expansion)
 	def _set_edit_widgets(self,enabled=True):
-		self.lineName.setEnabled(enabled)
-		self.cmbLabel.setEnabled(enabled)
-		self.lineSource.setEnabled(enabled)
 		self.pbUpdateSingle.setEnabled(enabled)
 		self.pbDeleteSingle.setEnabled(enabled)
 		self.labelLabel.setEnabled(enabled)
 		self.sourceLabel.setEnabled(enabled)
 		self.nameLable.setEnabled(enabled)
-	def _update_data_list(self,df):
+	def _update_data_list(self,data):
 		"""TODO: find some way to delegate getting the items and the sections to the dataset"""
 		self.dataTreeWidget.clear()
 		self._qtreeWidgetItems = []
-		sections = df.new_section.unique().tolist()
 		headerItem  = QTreeWidgetItem()
 		item    = QTreeWidgetItem()
-		for i,s in enumerate(sections):
+		for section,items in data.items():
 			parent = QTreeWidgetItem(self.dataTreeWidget)
-			parent.setText(0, s)
+			parent.setText(0, section)
 			parent.setFlags(parent.flags() | Qt.ItemIsTristate | Qt.ItemIsUserCheckable)
 			
-			items = df[df["new_section"] == s]["new_name"].tolist()
 			for n in items:
 				child = QTreeWidgetItem(parent)
 				child.setFlags(child.flags() | Qt.ItemIsUserCheckable)
-				child.setText(0, n)
+				child.setText(0, str(n))
 				child.setCheckState(0, Qt.Unchecked)
 				self._qtreeWidgetItems.append(child)
 	def _selected_labels(self):
@@ -351,31 +501,31 @@ class DataWidget(QWidget,Ui_DataWidget):
 			else:
 				btn.setStyleSheet("")
 	def _update_labels(self,labels):
-		vbox = QVBoxLayout()
 		for l in labels:
 			lblButton = QtWidgets.QPushButton(l)
 			lblButton.setCheckable(True)
 			lblButton.setChecked(True)
 			lblButton.clicked.connect(self.pbLabelClicked)
 			lblButton.setEnabled(True)
-			vbox.addWidget(lblButton)
-		self.labelsGroup.setLayout(vbox)
-		vbox.addStretch(1)
+			self.labelButtonsLayout.addWidget(lblButton)
+		self.labelButtonsLayout.addStretch(1)
 		self._color_selected_labels()
-		self.cmbLabel.clear()
 	def _filter_by_label(self,labels):	
-		df = self._currentDataset._data_df.copy()
-		df = df[df["label"].isin(labels)]
-		self._update_data_list(df)
+		data = self._currentDataset.get_data_list(labels=labels)
+		self._update_data_list(data)
 	def _refresh_view(self):
-		self._update_data_list(self._currentDataset._data_df)
-		self._update_labels(self._currentDataset._labels)
-
-
-
+		print(self._currentDataset.get_data_list())
+		self._update_data_list(self._currentDataset.get_data_list())
+		self._update_labels(self._currentDataset.labels)
+	def apply_challenge(self,challenge):
+		target_placeholders = {
+		"image": self._paintingWidget,
+		"caption": None,
+		"label": self.lblInstanceLabel
+		}
+		self._currentDataset.apply_challenge(challenge,self._currentItemId,target_placeholders)
 
 
 if __name__ == '__main__':
 
 	data = Dataset.load("/home/jalalirs/code/ihm/dataset/WOPR/")
-	print(data._data_df)

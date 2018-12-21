@@ -6,11 +6,12 @@ from . import qt_util as qtutil
 from .editlabel import EditLabel
 from .moveto import MoveTo
 from .confusionmatrix import ConfuisionMatrix
+from .lossplot import LossPlot
 from PyQt5.QtWidgets import QWidget,QTreeWidgetItem, QVBoxLayout,QAbstractButton
 from PyQt5 import QtCore, QtWidgets,QtGui
 from PyQt5.QtCore import Qt,QSize
 from PyQt5.QtGui import QColor, QPen, QBrush,QPixmap,QPainter,QPalette
-from qcustomplot import QCustomPlot, QCPBars, QCP
+#from qcustomplot import QCustomPlot, QCPBars, QCP
 import numpy as np
 from PIL import Image
 import os
@@ -48,8 +49,8 @@ class TrainingWidget(QWidget,Ui_TrainingWidget):
 		# setPalette(qpl);
 		# self.confusionMatrixWidget.setStyleSheet(
   #        "background-image:url(\":/images/qcustomtemplate.png\"); background-position: center;" );
-		self.lossWidget.setStyleSheet(
-			"background-image:url(\":/images/training_vs_validation.jpg\"); background-position: center;")
+		# self.lossWidget.setStyleSheet(
+		# 	"background-image:url(\":/images/training_vs_validation.jpg\"); background-position: center;")
 		self.convFilterWidget.setStyleSheet(
 			"background-image:url(\":/images/conv_filter.png\"); background-position: center;")
 
@@ -90,8 +91,17 @@ class TrainingWidget(QWidget,Ui_TrainingWidget):
 
 		values = [np.random.randint(len(labels), size=1000) for i in range(len(labels))]
 		agg_values = [[v.tolist().count(i) for v in values] for i in range(len(labels))]
-		self.c.plot_confusion(labels,colors,agg_values)
+		self.c.plot(labels,colors,agg_values)
 		self.confLayout.addWidget(self.c)
+
+
+		self.lw = LossPlot(self.lossWidget,
+			self.lossWidget.width(),self.lossWidget.height())
+
+		train = np.array([np.abs(1/x)+0.4 for x in range(1,50)])
+		test =  np.array([np.log(x)/0.5 for x in range(1,50)])
+		self.lw.plot(train,test)
+		self.lossLayout.addWidget(self.lw)
 
 	def on_confmatrix_clicked(self,event):
 		x,y = event.xdata, event.ydata
